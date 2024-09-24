@@ -2,7 +2,10 @@ import { asyncHandler } from "../utils/asyncHandler.js"
 import { apiError } from "../utils/apiError.js"
 import { apiResponse } from "../utils/apiResponse.js"
 import { User } from "../models/user.model.js"
-import { uploadOnCloudinary } from "../utils/cloudinary.js"
+import {
+  deleteFromCloudinary,
+  uploadOnCloudinary,
+} from "../utils/cloudinary.js"
 import jwt from "jsonwebtoken"
 import mongoose from "mongoose"
 const registerUser = asyncHandler(async (request, response) => {
@@ -58,8 +61,14 @@ const registerUser = asyncHandler(async (request, response) => {
     email,
     password,
     fullname,
-    avatar: avatarCloudinaryres.url,
-    coverImage: coverImageCloudinaryres?.url || "",
+    avatar: {
+      public_id: avatarCloudinaryres.public_id,
+      url: avatarCloudinaryres.secure_url,
+    },
+    coverImage: {
+      public_id: coverImageCloudinaryres?.public_id || "",
+      url: coverImageCloudinaryres?.secure_url || "",
+    },
   })
 
   const createdUser = await User.findById(user._id).select(
@@ -260,24 +269,29 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Avatar file is missing")
   }
 
-  //TODO: delete old image - assignment
-
   const avatar = await uploadOnCloudinary(avatarLocalPath)
 
   if (!avatar.url) {
     throw new ApiError(500, "Error while uploading on avatar")
   }
 
+  const avatarToDelete = req.user.avatar.public_id
   const user = await User.findByIdAndUpdate(
     req.user?._id,
     {
       $set: {
-        avatar: avatar.url,
+        avatar: {
+          public_id: avatar.public_id,
+          url: avatar.secure_url,
+        },
       },
     },
     { new: true }
   ).select("-password")
 
+  if (User.avatar.public_id) {
+    await deleteFromCloudinary(avatarToDelete)
+  }
   return res
     .status(200)
     .json(new ApiResponse(200, user, "Avatar image updated successfully"))
@@ -290,14 +304,13 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Cover image file is missing")
   }
 
-  //TODO: delete old image - assignment
-
   const coverImage = await uploadOnCloudinary(coverImageLocalPath)
 
   if (!coverImage.url) {
     throw new ApiError(500, "Error while uploading on avatar")
   }
 
+  const coverImageIdToDelete = req.user.coverImage.public_id
   const user = await User.findByIdAndUpdate(
     req.user?._id,
     {
@@ -308,6 +321,9 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     { new: true }
   ).select("-password")
 
+  if (user.coverImage.public_id) {
+    await deleteFromCloudinary(coverImageIdToDelete)
+  }
   return res
     .status(200)
     .json(new ApiResponse(200, user, "Cover image updated successfully"))
