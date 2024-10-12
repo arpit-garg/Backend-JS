@@ -86,7 +86,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
   // Now all you need to do is construct your aggregate without executing it like so, this means no await keyword or then blocks:
   const aggregate = Video.aggregate(pipeline)
   //paginate the results
-  const video = Video.aggregatePaginate(aggregate, {
+  const video = await Video.aggregatePaginate(aggregate, {
     page: parseInt(page),
     limit: parseInt(limit),
   })
@@ -324,11 +324,11 @@ const deleteVideo = asyncHandler(async (req, res) => {
   await deleteFromCloudinary(deletedVideo.videoFile.public_id, "video") // in destroy method specify resource type
 
   //delete video likes
-  Like.deleteMany({
+  await Like.deleteMany({
     video: videoId,
   })
   //delete video comments
-  Comment.deleteMany({
+  await Comment.deleteMany({
     video: videoId,
   })
 
